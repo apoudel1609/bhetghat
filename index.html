@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Collaborative Calendar Availability Tool</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #e9ecef;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        h2 {
+            text-align: center;
+        }
+
+        .password-section, .calendar-section {
+            margin-bottom: 20px;
+        }
+
+        input[type="password"], input[type="text"], input[type="submit"] {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+
+        .calendar-container {
+            overflow-x: auto;
+            margin-top: 10px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            border: 1px solid #ccc;
+            padding: 10px;
+            text-align: center;
+        }
+
+        th {
+            background-color: #343a40;
+            color: white;
+        }
+
+        .available {
+            background-color: #d4edda;
+        }
+
+        .not-available {
+            background-color: #f8d7da;
+        }
+
+        .calendar-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .calendar-nav button {
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            background-color: #007bff;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
+            transition: all 0.2s ease;
+        }
+
+        .calendar-nav button:hover {
+            background-color: #0056b3;
+            transform: translateY(-2px);
+        }
+
+        .info-message {
+            font-size: 16px;
+            color: #555;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        td span {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2>Bhetghat Karyakram</h2>
+
+        <div class="password-section">
+            <label for="password">Enter Password:</label>
+            <input type="password" id="password" placeholder="Enter password to access">
+            <input type="submit" value="Access Calendar" onclick="verifyPassword()">
+        </div>
+
+        <div class="calendar-section" id="calendar" style="display: none;">
+            <label for="name">Enter Your Name:</label>
+            <input type="text" id="name" placeholder="Your name">
+            <input type="submit" value="Submit Name" onclick="showInstructions()">
+            <p class="info-message" id="instructions" style="display: none;">Name saved. Now select your travel dates.</p>
+
+            <div class="calendar-nav">
+                <button onclick="changeMonth(-1)">&laquo; Previous</button>
+                <span id="month-year"></span>
+                <button onclick="changeMonth(1)">Next &raquo;</button>
+            </div>
+
+            <div class="calendar-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Sunday</th>
+                            <th>Monday</th>
+                            <th>Tuesday</th>
+                            <th>Wednesday</th>
+                            <th>Thursday</th>
+                            <th>Friday</th>
+                            <th>Saturday</th>
+                        </tr>
+                    </thead>
+                    <tbody id="calendar-body">
+                        <!-- Calendar will be generated here dynamically -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const correctPassword = 'dolmaya';
+        let currentMonth = new Date().getMonth();
+        let currentYear = new Date().getFullYear();
+
+        function verifyPassword() {
+            const password = document.getElementById('password').value;
+
+            if (password === correctPassword) {
+                document.querySelector('.password-section').style.display = 'none';
+                document.getElementById('calendar').style.display = 'block';
+                generateCalendar(currentMonth, currentYear);
+            } else {
+                alert('Incorrect password. Please try again.');
+            }
+        }
+
+        function generateCalendar(month, year) {
+            const calendarBody = document.getElementById('calendar-body');
+            calendarBody.innerHTML = ''; // Clear previous content
+
+            document.getElementById('month-year').textContent = `${new Date(year, month).toLocaleString('default', { month: 'long' })} ${year}`;
+
+            const firstDayOfMonth = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+            let date = 1;
+            for (let i = 0; i < 6; i++) { // 6 weeks to cover the full calendar
+                const row = document.createElement('tr');
+
+                for (let j = 0; j < 7; j++) {
+                    const cell = document.createElement('td');
+
+                    if (i === 0 && j < firstDayOfMonth) {
+                        cell.textContent = ''; // Empty cell before the start of the month
+                    } else if (date > daysInMonth) {
+                        break; // No more dates to fill
+                    } else {
+                        cell.innerHTML = `<span>${date}</span>`;
+                        cell.dataset.date = `${year}-${month + 1}-${date}`;
+                        cell.classList.add('not-available');
+                        cell.onclick = () => toggleAvailability(cell);
+                        date++;
+                    }
+
+                    row.appendChild(cell);
+                }
+
+                calendarBody.appendChild(row);
+            }
+        }
+
+        function changeMonth(direction) {
+            currentMonth += direction;
+            if (currentMonth < 0) {
+                currentMonth = 11;
+                currentYear--;
+            } else if (currentMonth > 11) {
+                currentMonth = 0;
+                currentYear++;
+            }
+            generateCalendar(currentMonth, currentYear);
+        }
+
+        function toggleAvailability(cell) {
+            const name = document.getElementById('name').value.trim();
+
+            if (!name) {
+                alert('Please enter your name before marking availability.');
+                return;
+            }
+
+            if (cell.classList.contains('not-available')) {
+                cell.classList.remove('not-available');
+                cell.classList.add('available');
+
+                const existingNames = cell.dataset.names ? JSON.parse(cell.dataset.names) : [];
+                if (!existingNames.includes(name)) {
+                    existingNames.push(name);
+                    cell.dataset.names = JSON.stringify(existingNames);
+                    cell.innerHTML = `<span>${cell.dataset.date.split('-')[2]}</span><br>${existingNames.join(', ')}`;
+                }
+            } else {
+                cell.classList.remove('available');
+                cell.classList.add('not-available');
+
+                let existingNames = JSON.parse(cell.dataset.names || '[]');
+                existingNames = existingNames.filter(n => n !== name);
+                cell.dataset.names = JSON.stringify(existingNames);
+
+                if (existingNames.length === 0) {
+                    cell.innerHTML = `<span>${cell.dataset.date.split('-')[2]}</span>`;
+                } else {
+                    cell.innerHTML = `<span>${cell.dataset.date.split('-')[2]}</span><br>${existingNames.join(', ')}`;
+                }
+            }
+        }
+
+        function showInstructions() {
+            const name = document.getElementById('name').value.trim();
+            if (!name) {
+                alert('Please enter your name.');
+            } else {
+                document.getElementById('instructions').style.display = 'block';
+                document.getElementById('instructions').textContent = `${name}, select your travel dates.`;
+            }
+        }
+    </script>
+</body>
+</html>
