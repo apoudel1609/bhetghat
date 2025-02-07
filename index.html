@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Collaborative Calendar Availability Tool</title>
+    <title>Bhetghat Karyakram</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -101,6 +101,138 @@
             display: block;
         }
     </style>
+    <script type="module">
+        // Firebase SDK imports
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.1.3/firebase-app.js";
+        import { getDatabase, ref, set, get, onValue } from "https://www.gstatic.com/firebasejs/9.1.3/firebase-database.js";
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+            databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_PROJECT_ID.appspot.com",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+
+        let currentMonth = new Date().getMonth();
+        let currentYear = new Date().getFullYear();
+
+        function verifyPassword() {
+            const password = document.getElementById('password').value;
+            if (password === 'dolmaya') {
+                document.querySelector('.password-section').style.display = 'none';
+                document.getElementById('calendar').style.display = 'block';
+                generateCalendar(currentMonth, currentYear);
+            } else {
+                alert('Incorrect password. Please try again.');
+            }
+        }
+
+        function generateCalendar(month, year) {
+            const calendarBody = document.getElementById('calendar-body');
+            calendarBody.innerHTML = ''; // Clear previous content
+
+            document.getElementById('month-year').textContent = `${new Date(year, month).toLocaleString('default', { month: 'long' })} ${year}`;
+
+            const firstDayOfMonth = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            let date = 1;
+
+            // Load existing data from Firebase for the month
+            const monthPath = `${year}-${month + 1}`;
+            get(ref(database, `calendar/${monthPath}`)).then(snapshot => {
+                const savedData = snapshot.exists() ? snapshot.val() : {};
+
+                for (let i = 0; i < 6; i++) { // 6 weeks to cover the full calendar
+                    const row = document.createElement('tr');
+
+                    for (let j = 0; j < 7; j++) {
+                        const cell = document.createElement('td');
+
+                        if (i === 0 && j < firstDayOfMonth) {
+                            cell.textContent = ''; // Empty cell before the start of the month
+                        } else if (date > daysInMonth) {
+                            break; // No more dates to fill
+                        } else {
+                            const dateKey = `${year}-${month + 1}-${date}`;
+                            cell.innerHTML = `<span>${date}</span>`;
+                            cell.dataset.date = dateKey;
+                            cell.classList.add('not-available');
+                            cell.onclick = () => toggleAvailability(cell);
+
+                            // If this date has saved names, display them
+                            if (savedData[dateKey]) {
+                                cell.classList.remove('not-available');
+                                cell.classList.add('available');
+                                cell.innerHTML += `<br>${savedData[dateKey].join(', ')}`;
+                            }
+                            date++;
+                        }
+                        row.appendChild(cell);
+                    }
+                    calendarBody.appendChild(row);
+                }
+            });
+        }
+
+        function toggleAvailability(cell) {
+            const name = document.getElementById('name').value.trim();
+            if (!name) {
+                alert('Please enter your name before marking availability.');
+                return;
+            }
+
+            const dateKey = cell.dataset.date;
+            const monthPath = dateKey.slice(0, dateKey.lastIndexOf('-'));
+            const dbRef = ref(database, `calendar/${monthPath}/${dateKey}`);
+
+            get(dbRef).then(snapshot => {
+                let names = snapshot.exists() ? snapshot.val() : [];
+
+                if (cell.classList.contains('not-available')) {
+                    cell.classList.remove('not-available');
+                    cell.classList.add('available');
+                    names.push(name);
+                } else {
+                    cell.classList.remove('available');
+                    cell.classList.add('not-available');
+                    names = names.filter(n => n !== name);
+                }
+
+                cell.innerHTML = `<span>${dateKey.split('-')[2]}</span><br>${names.join(', ')}`;
+                set(dbRef, names.length > 0 ? names : null); // Remove entry if no names
+            });
+        }
+
+        function changeMonth(direction) {
+            currentMonth += direction;
+            if (currentMonth < 0) {
+                currentMonth = 11;
+                currentYear--;
+            } else if (currentMonth > 11) {
+                currentMonth = 0;
+                currentYear++;
+            }
+            generateCalendar(currentMonth, currentYear);
+        }
+
+        function showInstructions() {
+            const name = document.getElementById('name').value.trim();
+            if (!name) {
+                alert('Please enter your name.');
+            } else {
+                document.getElementById('instructions').style.display = 'block';
+                document.getElementById('instructions').textContent = `${name}, select your travel dates.`;
+            }
+        }
+    </script>
 </head>
 <body>
 
@@ -117,7 +249,7 @@
             <label for="name">Enter Your Name:</label>
             <input type="text" id="name" placeholder="Your name">
             <input type="submit" value="Submit Name" onclick="showInstructions()">
-            <p class="info-message" id="instructions" style="display: none;">Name saved. Now select your travel dates.</p>
+            <p class="info-message" id="instructions" style="display: none;"></p>
 
             <div class="calendar-nav">
                 <button onclick="changeMonth(-1)">&laquo; Previous</button>
@@ -145,114 +277,5 @@
             </div>
         </div>
     </div>
-
-    <script>
-        const correctPassword = 'dolmaya';
-        let currentMonth = new Date().getMonth();
-        let currentYear = new Date().getFullYear();
-
-        function verifyPassword() {
-            const password = document.getElementById('password').value;
-
-            if (password === correctPassword) {
-                document.querySelector('.password-section').style.display = 'none';
-                document.getElementById('calendar').style.display = 'block';
-                generateCalendar(currentMonth, currentYear);
-            } else {
-                alert('Incorrect password. Please try again.');
-            }
-        }
-
-        function generateCalendar(month, year) {
-            const calendarBody = document.getElementById('calendar-body');
-            calendarBody.innerHTML = ''; // Clear previous content
-
-            document.getElementById('month-year').textContent = `${new Date(year, month).toLocaleString('default', { month: 'long' })} ${year}`;
-
-            const firstDayOfMonth = new Date(year, month, 1).getDay();
-            const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-            let date = 1;
-            for (let i = 0; i < 6; i++) { // 6 weeks to cover the full calendar
-                const row = document.createElement('tr');
-
-                for (let j = 0; j < 7; j++) {
-                    const cell = document.createElement('td');
-
-                    if (i === 0 && j < firstDayOfMonth) {
-                        cell.textContent = ''; // Empty cell before the start of the month
-                    } else if (date > daysInMonth) {
-                        break; // No more dates to fill
-                    } else {
-                        cell.innerHTML = `<span>${date}</span>`;
-                        cell.dataset.date = `${year}-${month + 1}-${date}`;
-                        cell.classList.add('not-available');
-                        cell.onclick = () => toggleAvailability(cell);
-                        date++;
-                    }
-
-                    row.appendChild(cell);
-                }
-
-                calendarBody.appendChild(row);
-            }
-        }
-
-        function changeMonth(direction) {
-            currentMonth += direction;
-            if (currentMonth < 0) {
-                currentMonth = 11;
-                currentYear--;
-            } else if (currentMonth > 11) {
-                currentMonth = 0;
-                currentYear++;
-            }
-            generateCalendar(currentMonth, currentYear);
-        }
-
-        function toggleAvailability(cell) {
-            const name = document.getElementById('name').value.trim();
-
-            if (!name) {
-                alert('Please enter your name before marking availability.');
-                return;
-            }
-
-            if (cell.classList.contains('not-available')) {
-                cell.classList.remove('not-available');
-                cell.classList.add('available');
-
-                const existingNames = cell.dataset.names ? JSON.parse(cell.dataset.names) : [];
-                if (!existingNames.includes(name)) {
-                    existingNames.push(name);
-                    cell.dataset.names = JSON.stringify(existingNames);
-                    cell.innerHTML = `<span>${cell.dataset.date.split('-')[2]}</span><br>${existingNames.join(', ')}`;
-                }
-            } else {
-                cell.classList.remove('available');
-                cell.classList.add('not-available');
-
-                let existingNames = JSON.parse(cell.dataset.names || '[]');
-                existingNames = existingNames.filter(n => n !== name);
-                cell.dataset.names = JSON.stringify(existingNames);
-
-                if (existingNames.length === 0) {
-                    cell.innerHTML = `<span>${cell.dataset.date.split('-')[2]}</span>`;
-                } else {
-                    cell.innerHTML = `<span>${cell.dataset.date.split('-')[2]}</span><br>${existingNames.join(', ')}`;
-                }
-            }
-        }
-
-        function showInstructions() {
-            const name = document.getElementById('name').value.trim();
-            if (!name) {
-                alert('Please enter your name.');
-            } else {
-                document.getElementById('instructions').style.display = 'block';
-                document.getElementById('instructions').textContent = `${name}, select your travel dates.`;
-            }
-        }
-    </script>
 </body>
 </html>
